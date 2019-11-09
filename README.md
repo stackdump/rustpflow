@@ -1,5 +1,7 @@
 # rustpflow
 
+[![Build Status](https://travis-ci.org/stackdump/rustpflow.svg?branch=master)](https://travis-ci.org/stackdump/rustpflow)
+
 Go library to use PetriNets encoded using pflow schema to construct state-machines.
 
 # Status
@@ -16,5 +18,5 @@ Eventually this lib will be used for Factom Asset Token WASM smart contracts.
 * https://factomize.com/forums/threads/dbgrow-factom-001-fat-smart-contracts.2029/
 * https://github.com/Factom-Asset-Tokens/wasm-contract-poc
 
-Since rust has good support for WASM - it seems like a good tool for constructing a library such as this.
+Since rust has good tooling support for WASM - it seems like a good tool for constructing a library such as this.
 

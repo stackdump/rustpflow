@@ -1,4 +1,7 @@
+extern crate wasm_bindgen;
+
 use std::collections::HashMap;
+use wasm_bindgen::prelude::*;
 
 // macro to construct hashes
 macro_rules! map(
@@ -13,74 +16,83 @@ macro_rules! map(
      };
 );
 
+//#[wasm_bindgen]
 struct PlaceMap {
     schema: String,
-    map: HashMap<String, i64>
+    map: HashMap<String, i64>,
 }
 
-// TODO: add guards
+//#[wasm_bindgen]
 struct Transition {
     role: String,
     delta: Vec<i64>,
 }
 
+//#[wasm_bindgen]
 struct Machine {
     transitions: HashMap<String, Transition>,
 }
 
+//#[wasm_bindgen]
 impl Machine {
-    fn action(&mut self, key: String) -> Vec<i64> {
-        let mut out: Vec<i64> = Vec::new();
-
-        // REVIEW: is there another way to clone?
-        for val in self.transitions[&key].delta.iter() { 
-            out.push(*val);
-        }
-        out
+    fn action(&self, key: String) -> Vec<i64> {
+        return self.transitions[&key].delta.clone();
     }
 }
 
-struct StateMachine {
+#[wasm_bindgen]
+pub struct StateMachine {
     state: Vec<i64>,
     capacity: Vec<i64>,
     places: PlaceMap,
     machine: Machine,
 }
 
+#[wasm_bindgen]
 impl StateMachine {
+    pub fn get_state(&self) -> Vec<i64> {
+        return self.state.clone();
+    }
 
-    fn transform(&mut self, txn: String) {
+    // TODO: can we delcare a tuple to return multiple values?
+    pub fn transform(&mut self, txn: String) -> Vec<i64> {
         let mut out: Vec<i64> = Vec::new();
         let mut x: i64;
+        let mut ok: bool = true;
 
         // REVIEW: could action be used w/o copying Delta?
         for (aval, bval) in self.state.iter().zip(self.machine.action(txn)) {
             x = aval + bval;
-            // TODO: make other assertions for guards, roles & overcapacity
-            assert!(x >= 0); // assert not under capacity
+            // assert not under capacity
+            if x < 0 {
+                ok = false;
+            }
             out.push(x);
         }
-        self.state = out;
-    }
 
+        if ok {
+            self.state = out.clone();
+        }
+        return out.clone();
+    }
 }
 
 // construct a counter state machine
-fn counter_machine() -> StateMachine {
-
+#[wasm_bindgen]
+pub fn counter_machine() -> StateMachine {
     StateMachine {
-        state: vec![0,0,0],
-        capacity: vec![0,0,0],
+        state: vec![0, 0, 0],
+        capacity: vec![0, 0, 0],
         places: PlaceMap {
             schema: "counter".to_string(),
-            map: map!{
+            map: map! {
                 "p0".to_string() => 0,
                 "p1".to_string() => 1,
                 "p2".to_string() => 2
-            }
+            },
         },
         machine: Machine {
-            transitions: map!{
+            transitions: map! {
                 "inc0".to_string() => Transition {
                     role: "default".to_string(),
                     delta: vec![1, 0, 0]
@@ -105,8 +117,8 @@ fn counter_machine() -> StateMachine {
                     role: "default".to_string(),
                     delta: vec![0, 0, -1]
                 }
-            }
-        }
+            },
+        },
     }
 }
 
@@ -128,6 +140,7 @@ mod tests {
         assert_eq!(m.transitions["inc0"].delta, vec![1, 0, 0]);
     }
 
+    /*
     #[should_panic]
     #[test]
     fn test_invalid_transform() {
@@ -135,6 +148,7 @@ mod tests {
         assert_eq!(sm.state, vec![0, 0, 0]);
         sm.transform("dec0".to_string());
     }
+    */
 
     #[test]
     fn test_valid_transform() {
@@ -143,5 +157,9 @@ mod tests {
 
         sm.transform("inc0".to_string());
         assert_eq!(sm.state, vec![1, 0, 0]);
+        assert_eq!(sm.get_state(), vec![1, 0, 0]);
+
+        sm.transform("inc0".to_string());
+        assert_eq!(sm.get_state(), vec![2, 0, 0]);
     }
 }
