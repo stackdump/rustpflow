@@ -16,27 +16,32 @@ macro_rules! map(
      };
 );
 
-//#[wasm_bindgen]
+/*
+NOTE: Place Definitions are purely informational
+they are useful when describing the meaning of each value in the state machine
+but are not needed to execute and validate state transformations
+*/
+
+/*
 struct PlaceMap {
     schema: String,
     map: HashMap<String, i64>,
 }
+*/
 
-//#[wasm_bindgen]
 struct Transition {
     role: String,
     delta: Vec<i64>,
+    guards: HashMap<String, Vec<i64>>,
 }
 
-//#[wasm_bindgen]
 struct Machine {
     transitions: HashMap<String, Transition>,
 }
 
-//#[wasm_bindgen]
 impl Machine {
-    fn action(&self, key: String) -> Vec<i64> {
-        return self.transitions[&key].delta.clone();
+    fn action(&self, key: String) -> &Transition {
+        return &self.transitions[&key];
     }
 }
 
@@ -44,8 +49,25 @@ impl Machine {
 pub struct StateMachine {
     state: Vec<i64>,
     capacity: Vec<i64>,
-    places: PlaceMap,
+    //places: PlaceMap,
     machine: Machine,
+}
+
+fn vadd(a: Vec<i64>, b: Vec<i64>) -> (Vec<i64>, bool) {
+    let mut out: Vec<i64> = Vec::new();
+    let mut ok: bool = true;
+    let mut x: i64;
+
+    for (aval, bval) in a.iter().zip(b) {
+        x = aval + bval;
+
+        if x < 0 {
+            ok = false;
+        }
+        out.push(x);
+    }
+
+    return (out, ok);
 }
 
 #[wasm_bindgen]
@@ -54,26 +76,37 @@ impl StateMachine {
         return self.state.clone();
     }
 
-    // TODO: can we delcare a tuple to return multiple values?
-    pub fn transform(&mut self, txn: String) -> Vec<i64> {
-        let mut out: Vec<i64> = Vec::new();
-        let mut x: i64;
-        let mut ok: bool = true;
+    // report required to execute an action
+    pub fn get_role(&mut self, txn: String) -> String {
+        return self.machine.action(txn).role.to_string();
+    }
 
-        // REVIEW: could action be used w/o copying Delta?
-        for (aval, bval) in self.state.iter().zip(self.machine.action(txn)) {
-            x = aval + bval;
-            // assert not under capacity
-            if x < 0 {
-                ok = false;
+    pub fn transform(&mut self, txn: String) -> bool {
+        let t = self.machine.action(txn);
+        let (out, ok) = vadd(self.state.clone(), t.delta.clone());
+
+        // test undercapacity
+        if !ok {
+            return false;
+        }
+
+        // test overcapacity
+        for (i, cap) in self.capacity.iter().enumerate() {
+            if *cap > 0 && out[i] > *cap {
+                return false;
             }
-            out.push(x);
         }
 
-        if ok {
-            self.state = out.clone();
+        // test guard conditions
+        for (_, condition) in &t.guards {
+            let (_, fail) = vadd(self.state.clone(), condition.clone());
+            if fail {
+                return false;
+            }
         }
-        return out.clone();
+
+        self.state = out;
+        return true;
     }
 }
 
@@ -81,8 +114,9 @@ impl StateMachine {
 #[wasm_bindgen]
 pub fn counter_machine() -> StateMachine {
     StateMachine {
-        state: vec![0, 0, 0],
-        capacity: vec![0, 0, 0],
+        state: vec![0, 0, 0], // initial state
+        capacity: vec![0, 0, 1],
+        /*
         places: PlaceMap {
             schema: "counter".to_string(),
             map: map! {
@@ -91,31 +125,40 @@ pub fn counter_machine() -> StateMachine {
                 "p2".to_string() => 2
             },
         },
+        */
         machine: Machine {
             transitions: map! {
                 "inc0".to_string() => Transition {
                     role: "default".to_string(),
-                    delta: vec![1, 0, 0]
+                    delta: vec![1, 0, 0],
+                    guards: map! {
+                        "atomic".to_string() => vec![-1, 0, 0]
+                    },
                 },
                 "inc1".to_string() => Transition {
                     role: "default".to_string(),
-                    delta: vec![0, 1, 0]
+                    delta: vec![0, 1, 0],
+                    guards: HashMap::new(),
                 },
                 "inc2".to_string() => Transition {
                     role: "default".to_string(),
-                    delta: vec![0, 0, 1]
+                    delta: vec![0, 0, 1],
+                    guards: HashMap::new(),
                 },
                 "dec0".to_string() => Transition {
                     role: "default".to_string(),
-                    delta: vec![-1, 0, 0]
+                    delta: vec![-1, 0, 0],
+                    guards: HashMap::new(),
                 },
                 "dec1".to_string() => Transition {
                     role: "default".to_string(),
-                    delta: vec![0, -1, 0]
+                    delta: vec![0, -1, 0],
+                    guards: HashMap::new(),
                 },
                 "dec2".to_string() => Transition {
                     role: "default".to_string(),
-                    delta: vec![0, 0, -1]
+                    delta: vec![0, 0, -1],
+                    guards: HashMap::new(),
                 }
             },
         },
@@ -129,37 +172,39 @@ mod tests {
 
     #[test]
     fn test_fields() {
-        let sm = counter_machine();
-        let m = sm.machine;
-        let p = sm.places;
-
-        assert_eq!(p.schema, "counter");
-        assert_eq!(p.map["p0"], 0);
-        assert_eq!(sm.state[0], 0);
-        assert_eq!(m.transitions["inc0"].role, "default");
-        assert_eq!(m.transitions["inc0"].delta, vec![1, 0, 0]);
-    }
-
-    /*
-    #[should_panic]
-    #[test]
-    fn test_invalid_transform() {
         let mut sm = counter_machine();
-        assert_eq!(sm.state, vec![0, 0, 0]);
-        sm.transform("dec0".to_string());
+        assert_eq!(sm.get_role("inc0".to_string()), "default");
+        assert_eq!(sm.get_state()[0], 0);
     }
-    */
+
+    #[test]
+    fn test_guard_condition() {
+        let mut sm = counter_machine();
+        assert!(sm.transform("inc0".to_string()));
+        assert_eq!(sm.get_state(), vec![1, 0, 0]);
+
+        assert!(!sm.transform("inc0".to_string())); // fails guard condition
+        assert_eq!(sm.get_state(), vec![1, 0, 0]);
+    }
 
     #[test]
     fn test_valid_transform() {
         let mut sm = counter_machine();
         assert_eq!(sm.state, vec![0, 0, 0]);
+        assert!(sm.transform("inc1".to_string()));
+        assert!(sm.transform("inc1".to_string()));
+        assert_eq!(sm.get_state(), vec![0, 2, 0]); // valid actions work
+    }
 
-        sm.transform("inc0".to_string());
-        assert_eq!(sm.state, vec![1, 0, 0]);
-        assert_eq!(sm.get_state(), vec![1, 0, 0]);
+    #[test]
+    fn test_capacity_limit() {
+        let mut sm = counter_machine();
+        assert!(!sm.transform("dec0".to_string())); // fails undercapacity check
 
-        sm.transform("inc0".to_string());
-        assert_eq!(sm.get_state(), vec![2, 0, 0]);
+        assert!(sm.transform("inc2".to_string()));
+        assert_eq!(sm.get_state(), vec![0, 0, 1]);
+
+        assert!(!sm.transform("inc2".to_string())); // fails overcapacity check
+        assert_eq!(sm.get_state(), vec![0, 0, 1]);
     }
 }
