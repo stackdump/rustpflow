@@ -20,3 +20,26 @@ Eventually this lib will be used for Factom Asset Token WASM smart contracts.
 
 Since rust has good tooling support for WASM - it seems like a good tool for constructing a library such as this.
 
+## Petri-Net GUI editor
+
+Use the Java app
+
+```
+# download the jar
+wget https://github.com/FactomProject/ptnet-eventstore/raw/master/pneditor-0.71.jar
+
+# run w/ sun java
+/opt/jre1.8.0_211/bin/java -jar /opt/pflow/pneditor-0.71.jar &
+```
+
+## Build
+
+Use python to generate rust from pflow xml.
+
+Generate wasm from rust.
+
+```
+pip install .
+./gen.py
+./build.sh
+```
