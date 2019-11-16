@@ -1,15 +1,14 @@
 ### WIP
 
-duplicate functionality of https://github.com/stackdump/gopflow
-
 WIP
 ---
-- [ ] add code generation
+- [ ] make templating happen more cleanly
+- [ ] add a way to check roles
 
+FEATURES
+--------
+- [x] add code generation ./gen.py
 
-NOTES
------
-
-### Code Generation
-
-Using python to convert .pflow to Rust/WASM
+ICEBOX
+------
+- [ ] duplicate full functionality of https://github.com/stackdump/gopflow

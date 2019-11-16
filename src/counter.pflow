@@ -24,6 +24,14 @@
             <tokens>0</tokens>
             <isStatic>false</isStatic>
         </place>
+        <place>
+            <id>7</id>
+            <x>-909</x>
+            <y>-391</y>
+            <label>CHECK</label>
+            <tokens>1</tokens>
+            <isStatic>false</isStatic>
+        </place>
         <transition>
             <id>3</id>
             <x>-818</x>
@@ -48,6 +56,18 @@
             <y>-370</y>
             <label>DEC1</label>
         </transition>
+        <transition>
+            <id>8</id>
+            <x>-909</x>
+            <y>-469</y>
+            <label>OFF</label>
+        </transition>
+        <transition>
+            <id>9</id>
+            <x>-910</x>
+            <y>-331</y>
+            <label>ON</label>
+        </transition>
         <arc>
             <type>regular</type>
             <sourceId>2</sourceId>
@@ -70,6 +90,30 @@
             <type>regular</type>
             <sourceId>3</sourceId>
             <destinationId>1</destinationId>
+            <multiplicity>1</multiplicity>
+        </arc>
+        <arc>
+            <type>regular</type>
+            <sourceId>7</sourceId>
+            <destinationId>9</destinationId>
+            <multiplicity>1</multiplicity>
+        </arc>
+        <arc>
+            <type>regular</type>
+            <sourceId>8</sourceId>
+            <destinationId>7</destinationId>
+            <multiplicity>1</multiplicity>
+        </arc>
+        <arc>
+            <type>inhibitor</type>
+            <sourceId>7</sourceId>
+            <destinationId>3</destinationId>
+            <multiplicity>1</multiplicity>
+        </arc>
+        <arc>
+            <type>inhibitor</type>
+            <sourceId>7</sourceId>
+            <destinationId>4</destinationId>
             <multiplicity>1</multiplicity>
         </arc>
     </subnet>

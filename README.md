@@ -31,6 +31,9 @@ wget https://github.com/FactomProject/ptnet-eventstore/raw/master/pneditor-0.71.
 # run w/ sun java
 /opt/jre1.8.0_211/bin/java -jar /opt/pflow/pneditor-0.71.jar &
 ```
+open sample `./src/counter.pflow`
+
+![counter.pflow](./docs/counter.png "pflow example")
 
 ## Build
 
@@ -40,6 +43,6 @@ Generate wasm from rust.
 
 ```
 pip install .
-./gen.py
+./gen.py # currently have to copy output
 ./build.sh
 ```

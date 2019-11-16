@@ -1,8 +1,12 @@
-import os, sys, imp
+import os
+import sys
+import imp
 import xml.etree.ElementTree as ET
+
 
 class InvalidFormat(Exception):
     pass
+
 
 class PFlowParser(object):
 
@@ -47,35 +51,36 @@ class PFlowParser(object):
         for r in self.root.findall('roles'):
             rl = rl + r.findall('role')
 
-        return [ self._el_to_dict(el) for el in rl ]
+        return [self._el_to_dict(el) for el in rl]
 
     def _arcs(self):
         ar = []
         for n in self.nets:
             ar = ar + n.findall('arc')
 
-        return [ self._el_to_dict(el) for el in ar ]
+        return [self._el_to_dict(el) for el in ar]
 
     def _places(self):
         pl = []
         for n in self.nets:
             pl = pl + n.findall('place')
 
-        return sorted([ self._el_to_dict(el) for el in pl ], key=lambda x: x['id'])
+        return sorted([self._el_to_dict(el) for el in pl], key=lambda x: x['id'])
 
     def _ref_places(self):
         rp = []
         for n in self.nets:
             rp = rp + n.findall('referencePlace')
 
-        return [ self._el_to_dict(el) for el in rp ]
+        return [self._el_to_dict(el) for el in rp]
 
     def _transitions(self):
         tx = []
         for n in self.nets:
             tx = tx + n.findall('transition')
 
-        return sorted([ self._el_to_dict(el) for el in tx ], key=lambda x: x['id'])
+        return sorted([self._el_to_dict(el) for el in tx], key=lambda x: x['id'])
+
 
 class PFlowNet(PFlowParser):
 
@@ -86,6 +91,12 @@ class PFlowNet(PFlowParser):
 
     def empty_vector(self):
         return [0 for _ in self.place_ids]
+
+    def initial_vector(self):
+        return [p['initial'] for _, p in self.places.items()]
+
+    def capacity_vector(self):
+        return [p['capacity'] for _, p in self.places.items()]
 
     def _reindex(self, pflow):
         # REVIEW: isStatic attribute indicates that a place is shared
@@ -106,7 +117,7 @@ class PFlowNet(PFlowParser):
             if 'capacity' in p:
                 cap = p['capacity']
             else:
-                cap = 0 
+                cap = 0
 
             self.places[p['label']] = {
                 "offset": i,
@@ -114,7 +125,7 @@ class PFlowNet(PFlowParser):
                 "initial": p['tokens']
             }
 
-            i+=1
+            i += 1
 
         self.ref_places = {}
         for rp in pflow['ref_places']:
@@ -135,7 +146,6 @@ class PFlowNet(PFlowParser):
             for t in r['transitionId']:
                 key = self.transition_ids[t]
                 self.transitions[key]['role'] = r['name']
-
 
         for a in pflow['arcs']:
             p = None
@@ -161,7 +171,7 @@ class PFlowNet(PFlowParser):
 
             pl = self.places[self.place_labels[p]]
             tx = self.transitions[t]
-                
+
             if a['type'] == 'inhibitor':
                 g = self.empty_vector()
                 g[pl['offset']] = unit
@@ -171,52 +181,51 @@ class PFlowNet(PFlowParser):
             else:
                 assert False
 
-# REVIEW: consider relocating
-class StateMachine(object):
 
-    storage_provider = None
-    """ storage provider class """
+class StateMachine(object):
 
     def __init__(self, pflow):
         self.name = pflow.name
         self.places = pflow.places
         self.transitions = pflow.transitions
+        self.initial = pflow.initial_vector()
+        self.capacity = pflow.capacity_vector()
 
     def __str__(self):
         """ print source code """
         return self.to_source()
 
     def to_source(self):
-        """ generate state machine source code """
+        """ generate state machine rust source code """
 
-        # REVIEW: could we infer source modules via introspection?
-        out = ""
-        out += "\nfrom ptflow.state import StateMachine\n\n\n"
-        out += "class Machine(StateMachine, Storage):\n\n"
-
-        out += "    places = {\n"
-        for t, attrib in self.places.items():
-            out += "        '%s': %s,\n" % (t, attrib)
-        out += "    }\n\n"
-
-        out += "    transitions = {\n"
+        out = "#[wasm_bindgen]\n"
+        out += "pub fn new() -> StateMachine {\n"
+        out += "    StateMachine {\n"
+        out += "        state: vec!%s,\n" % self.initial
+        out += "        capacity: vec!%s,\n" % self.capacity
+        out += "        machine: Machine {\n"
+        out += "            transitions: map! {\n"
         for t, attrib in self.transitions.items():
             out += \
-            "        '%s': {\n" % t + \
-            "            'delta': %s,\n" % attrib['delta'] + \
-            "            'role': '%s',\n" % attrib  ['role']
+                '                "%s".to_string() => Transition {\n' % t + \
+                '                    delta: vec!%s,\n' % attrib['delta'] + \
+                '                    role: "%s".to_string(),\n' % attrib['role']
 
             if len(attrib['guards']) > 0:
                 for l, g in attrib['guards'].items():
                     out += \
-                    "            'guards': {\n" + \
-                    "                '%s': %s,\n" % (l, g)
-                out += "            }\n"
+                        "                    guards: map! {\n" + \
+                        '                        "%s".to_string() => vec!%s,\n' % (l, g)
+                out = out[:-2] # trim trailing comma
+                out += "\n                    }\n"
             else:
-                out += "            'guards': {},\n" \
+                out += "                    guards: HashMap::new(),\n" \
 
-            out += "        },\n"
-
+            out += "                },\n"
+        out = out[:-2] # trim trailing comma
+        out += "\n            },\n"
+        out += "        },\n"
         out += "    }\n"
+        out += "}\n"
 
         return out
